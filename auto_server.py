@@ -22,7 +22,10 @@
 #
 #  Python Crypto and Python Pexpect is required - apt-get install python-crypto python-pexpect
 #
-import socketserver
+
+# needed for python2/3 compatibility
+try: import SocketServer as socketserver
+except ImportError: import socketserver
 from threading import Thread
 import subprocess
 import sys
@@ -41,7 +44,7 @@ try:
     from Crypto.Cipher import AES
 
 except ImportError:
-    print("[!] ERROR: python-crypto not installed. Run 'apt-get install python-pycrypto pexpect' to fix.")
+    print("[!] ERROR: pycryptodome not installed. Run 'python3 -m install pycrypto' to fix.")
     sys.exit()
 
 # check pexpect library
@@ -49,7 +52,7 @@ try:
     import pexpect
 
 except ImportError:
-    print("[!] ERROR: pexpect not installed. Run apt-get install pexpect to fix.")
+    print("[!] ERROR: pexpect not installed. Run 'python3 -m install pexpect' to fix.")
     sys.exit()
 
 # global lock to restart ossec service
@@ -66,6 +69,7 @@ class service(socketserver.BaseRequestHandler):
         # parse OSSEC hids client certificate
         def parse_client(hostname, ipaddr):
             child = pexpect.spawn("/var/ossec/bin/manage_agents")
+            child.timeout=300
             child.expect("Choose your action")
             child.sendline("a")
             child.expect("for the new agent")
@@ -89,17 +93,18 @@ class service(socketserver.BaseRequestHandler):
                 child.sendline("q")
                 child.close()
                 child = pexpect.spawn("/var/ossec/bin/manage_agents -e %s" % (id))
+                child.timeout=300 
                 for line in child: key = line.rstrip() # actual key export
                 # when no agents are there and one is removed - the agent wont be added properly right away - need to go through the addition again - appears to be an ossec manage bug - going through everything again appears to solve this
                 time.sleep(0.5)
-                if "Invalid ID" in str(key):
-                    return 0
+                if "Invalid ID" in str(key): return 0
                 return key
 
             # if we have a duplicate hostname
             else:
                 child.close()
                 child = pexpect.spawn("/var/ossec/bin/manage_agents -l")
+                child.timeout=300 
                 for line in child:
                     try: line = str(line, 'UTF-8').rstrip()
                     except TypeError: line = str(line).rstrip() # python 2 and 3 compatibility
@@ -108,10 +113,12 @@ class service(socketserver.BaseRequestHandler):
                         break
                 child.close()
                 time.sleep(0.5)
-                print(remove_id)
-                child = pexpect.spawn("/var/ossec/bin/manage_agents -r %s" % (remove_id)) #, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).wait()
+                child = pexpect.spawn("/var/ossec/bin/manage_agents -r %s" % (remove_id))
+                child.timeout=300
+                child.expect("manage_agents: Exiting.")
+                time.sleep(2)
                 child.close()
-                time.sleep(0.5)
+                time.sleep(1)
                 return 0
 
         def decryptaes(cipher, data, padding):
@@ -134,6 +141,7 @@ class service(socketserver.BaseRequestHandler):
 
         # main AES encrypt and decrypt function with 32 block size padding
         def aescall(secret, data, format):
+
             # padding and block size
             PADDING = '{'
             BLOCK_SIZE = 32
@@ -156,13 +164,13 @@ class service(socketserver.BaseRequestHandler):
         # recommend changing this - if you do, change auto_ossec.py as well - -
         # would recommend this is the default published to git
         secret = "(3j+-sa!333hNA2u3h@*!~h~2&^lk<!B"
+
         print("Client connected with ", self.client_address)
         try:
             data = self.request.recv(1024)
             if data != "":
                 try:
                     data = aescall(secret, data, "decrypt")
-
                     # if this section clears -we know that it is a legit
                     # request, has been decrypted and we're ready to rock
                     if "BDSOSSEC" in data:
@@ -190,13 +198,14 @@ class service(socketserver.BaseRequestHandler):
                             if ossec_key == 0:
                                 ossec_key = parse_client(hostname, ipaddr)
                                 # run through again for trouble ones - ossec bug looks like - but this is a decent workaround
-                                if ossec_key == 0: ossec_key = parse_client(hostname, ipaddr)
+                                if ossec_key == 0:
+                                    ossec_key = parse_client(hostname, ipaddr)
 
                             print("[*] Provisioned new key for hostname: %s with IP of: %s" % (hostname, ipaddr))
                             try: ossec_key = ossec_key.decode('UTF-8')
                             except: ossec_key = str(ossec_key) # python2 compatibility
                             ossec_key_crypt = aescall(secret, ossec_key, "encrypt")
-                            try: ossec_key_crypt = str(ossec_key_crypt, 'UTF-8')
+                            try: ossec_key_crypt = str(ossec_key_crypt, 'UTF-8') 
                             except TypeError: ossec_key_crypt = str(ossec_key_crypt)
                             print("[*] Sending new key to %s: " % (hostname) + str(ossec_key))
                             # if client disconnected dont crash everything

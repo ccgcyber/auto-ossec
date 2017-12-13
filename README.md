@@ -1,6 +1,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Binary Defense Systems Auto-Enroll for OSSEC
-Written by: David Kennedy - BDS
+Written by: David Kennedy - Binary Defense
+Twitter: @HackingDave @BinaryDefense
 Supported Systems: Linux, OS X, Windows
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -57,6 +58,16 @@ If you install OSSEC regularly on Linux, you can just install OSSEC normally on 
 
 ./auto_ossec.bin <server_ip>
 
+For the Python version, use:
+
+pip3 install -r requirements.txt
+
+This will install python-crypto (for AES support) and pexpect.
+
+Then:
+
+python auto_ossec.py <server_ip>
+
 ## Install on Windows
 
 For Windows, install OSSEC normally - since it is an MSI you should install this silently. Once OSSEC is installed, run:
@@ -69,10 +80,18 @@ auto_ossec.exe <server_ip> 0.0.0.0/0
 
 This will be useful if your system changes IP addresses frequently (dynamic DNS)
 
-### Supported Operating Systems
+## Compile on Windows (auto_ossec.py)
 
-Linux
-OS X
-Windows
+If you want to compile your own auto_ossec.py (instead of the auto_ossec.exe provided), follow the steps below on Windows
 
+1. Download http://aka.ms/vcpython2 (Microsoft Visual C++ 9.0 for Python)
+2. Download and Install: https://www.microsoft.com/en-us/download/details.aspx?id=5555
+3. Download pyinstaller.org (latest version)
+4. Download Python and Install (python.org)
+5. Open up a command prompt, type: PATH=C:\Python27 (or 2 or 3 whatever)
+6. python -m easy_install pycrypto
+7. Unzip pyinstaller, navigate to the directory and type python pyinstaller --onefile auto_ossec.py - this will generate a binary under auto_ossec\dist
 
+## Supported Operating Systems
+
+Linux, OS X, Windows
